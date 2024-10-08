@@ -13,8 +13,8 @@ df <- df %>%
   filter(Total_pubs>1) %>%
   filter(Total_pubs != max(Total_pubs))
 
-disciplina_map <- data.frame(
-  Disciplina = c(
+discipline_map <- data.frame(
+  Discipline = c(
     "Antropología Social",
     "Arqueología",
     "Expresión Gráfica Arquitectónica",
@@ -100,7 +100,7 @@ disciplina_map <- data.frame(
   )
 )
 
-df$field <- disciplina_map$field[match(df$Disciplina, disciplina_map$Disciplina)]
+df$field <- discipline_map$field[match(df$Discipline, discipline_map$Discipline)]
 
 df_doc <- read.delim('data/authors_publications_full_lang.tsv',
                      fileEncoding = 'UTF-8',

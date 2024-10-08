@@ -32,8 +32,8 @@ authors <- authors %>%
   filter(Total_pubs != max(Total_pubs)) #Remove the Pope
 
 # Group discipline into broader fields
-disciplina_map <- data.frame( # Lookup table to match disc and fields
-  Disciplina = c(
+discipline_map <- data.frame( # Lookup table to match disc and fields
+  Discipline = c(
     "Antropología Social",
     "Arqueología",
     "Expresión Gráfica Arquitectónica",
@@ -120,7 +120,7 @@ disciplina_map <- data.frame( # Lookup table to match disc and fields
   )
 
 # Use lookup table to update authors$field
-authors$field <- disciplina_map$field[match(authors$Disciplina, disciplina_map$Disciplina)]
+authors$field <- discipline_map$field[match(authors$Discipline, discipline_map$Discipline)]
 ```
 
 Distribution by field.
