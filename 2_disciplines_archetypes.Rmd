@@ -1,0 +1,405 @@
+---
+title: "Publication profiles of Humanists per disciplines"
+format: pdf
+editor: visual
+---
+
+```{r}
+library(archetypes)
+library(ggplot2)
+library(tidyverse)
+library(tidyr)
+library(dplyr)
+library(geomtextpath)
+library(fmsb)
+library(ggridges)
+library(viridis)
+library(ggtext)
+
+```
+
+# Description
+
+```{r}
+authors <- readr::read_delim("data/authors_metrics_dialnet.tsv", 
+    delim = "\t", escape_double = FALSE, 
+    trim_ws = TRUE)
+```
+
+Analysis of a set of 60,063 researchers from the Humanities. They are distributed among 40 different disciplines, but we should reshuffle them. Also there are NA values in some variables.
+
+```{r}
+# summary(authors)
+
+authors <- authors %>%
+  filter(!is.na(Age)) %>%
+  filter(First_pub > 1949) %>%
+  filter(Total_pubs>1) %>% # TEST
+  filter(Total_pubs != max(Total_pubs)) #Remove the Pope
+
+# Group discipline into broader fields
+disciplina_map <- data.frame( # Lookup table to match disc and fields
+  Disciplina = c(
+    "Antropología Social",
+    "Arqueología",
+    "Expresión Gráfica Arquitectónica",
+    "Expresión Gráfica en la Ingeniería",
+    "Historia del Arte",
+    "Pintura",
+    "Estudios Árabes e Islámicos",
+    "Estudios de Asía Oriental",
+    "Estudios Hebreos y Arameos",
+    "Filología Alemana",
+    "Filología Catalana",
+    "Filología Eslava",
+    "Filología Francesa",
+    "Filología Gallega y Portuguesa",
+    "Filología Griega",
+    "Filología Inglesa",
+    "Filología Italiana",
+    "Filología Latina",
+    "Filología Románica",
+    "Filología Vasca",
+    "Filosofía",
+    "Filosofía Moral",
+    "Lógica y Filosofía de la Ciencia",
+    "Geografía Humana",
+    "Ciencias y Técnicas Historiográficas",
+    "Historia Antigua",
+    "Historia Contemporánea",
+    "Historia de América",
+    "Historia de la Ciencia",
+    "Historia del Pensamiento y de los Movimientos ...",
+    "Historia Medieval",
+    "Historia Moderna",
+    "Prehistoria",
+    "Lengua Española",
+    "Lingüística General",
+    "Lingüística Indoeuropea",
+    "Literatura Española",
+    "Música",
+    "Paleontología",
+    "Traducción e Interpretación"
+  ),
+  field = c(
+    "Anthropology",
+    "Archaeology",
+    "Arts",
+    "Arts",
+    "Arts",
+    "Arts",
+    "Cultural Studies",
+    "Cultural Studies",
+    "Cultural Studies",
+    "Philology",
+    "Philology",
+    "Philology",
+    "Philology",
+    "Philology",
+    "Philology",
+    "Philology",
+    "Philology",
+    "Philology",
+    "Philology",
+    "Philology",
+    "Philosophy",
+    "Philosophy",
+    "Philosophy",
+    "Geography",
+    "History",
+    "History",
+    "History",
+    "History",
+    "History",
+    "History",
+    "History",
+    "History",
+    "History",
+    "Language & Linguistics",
+    "Language & Linguistics",
+    "Language & Linguistics",
+    "Literature",
+    "Music",
+    "Paleontology",
+    "Translation Studies"
+    )
+  )
+
+# Use lookup table to update authors$field
+authors$field <- disciplina_map$field[match(authors$Disciplina, disciplina_map$Disciplina)]
+
+```
+
+Distribution by field.
+
+```{r}
+authors %>%
+  group_by(field) %>%
+  summarise(count = n(), age = mean(Age)) %>%
+  ggplot(aes(x = reorder(field, count), y = count, fill = age)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Field", y = "No. academics") +
+  theme_classic() +
+  coord_flip()
+```
+
+Evolution per age.
+
+```{r}
+ggplot(authors, aes(x = First_pub)) +
+       geom_histogram(color = "black", fill = "darkgrey") +
+  xlim(1950, 2020) +
+  labs(x ="First publication year", y = "No. academics") +
+  theme_classic()
+```
+
+One would expect age to be highly correlated with number of publications.
+
+```{r}
+cor(authors$Age, authors$Total_pubs)
+```
+
+```{r}
+plot(authors$Age, authors$Total_pubs)
+```
+
+Publication profile by age and by field.
+
+# Archetypes
+
+Create distribution.
+
+```{r}
+# Description
+authors %>%
+  select(
+    `CODIGO AUTOR DIALNET`,
+    Article,
+    Book,
+    Chapter,
+    `Proceeding paper`,
+    `Edited-proceedings`,
+    `Edited-book`,
+    Total_pubs,
+    Inter,
+    Local
+  ) %>%
+  tidyr::pivot_longer(
+    cols = !`CODIGO AUTOR DIALNET`,
+    names_to = "variable",
+    values_to = "value"
+  ) %>%
+  group_by(variable) %>%
+  summarise(n = n(), mean(value), sd = sd(value))
+```
+
+I am going to define the variables and conduct the archetypal analysis based on two dimensions:
+
+-   **Type of outputs.** That is, the publication types in which they communicate their findings. we consider 6 publication types:
+
+    -   Books
+
+    -   Book chapters
+
+    -   Proceedings papers
+
+    -   Edited books
+
+    -   Edited proceedings
+
+-   **Outreach.** That is, the international scope of their outputs. We consider two variables:
+
+    -   Publications indexed in WoS and Scopus
+
+    -   Non-English publications
+
+```{r}
+table(authors$field)
+```
+
+```{r}
+field <- 'Anthropology' # select one specific field
+authors_dis <- authors[which(authors$field==field),]
+
+arcdf.2dim <- authors_dis %>%
+  select(Article, Book, Chapter, `Proceeding paper`, `Edited-proceedings`, `Edited-book`, Inter, Local, Total_pubs)
+
+names(arcdf.2dim) <- c("Article", "Book", "Chapter", "Proceedingpaper", "Editedproceedings", "Editedbook", "Inter", "Local", "Total_pubs")
+
+# Create proportions of everything
+
+arcdf.2dim$papers <- arcdf.2dim$Article/arcdf.2dim$Total_pubs
+arcdf.2dim$books <- arcdf.2dim$Book/arcdf.2dim$Total_pubs
+arcdf.2dim$chapters <- arcdf.2dim$Chapter/arcdf.2dim$Total_pubs
+arcdf.2dim$proceedings <- arcdf.2dim$Proceedingpaper/arcdf.2dim$Total_pubs
+arcdf.2dim$editor <- arcdf.2dim$Editedbook / arcdf.2dim$Total_pubs
+arcdf.2dim$confeditor <- arcdf.2dim$Editedproceedings / arcdf.2dim$Total_pubs
+arcdf.2dim$mainstream <- arcdf.2dim$Inter/arcdf.2dim$Total_pubs
+arcdf.2dim$local <- arcdf.2dim$Local/arcdf.2dim$Total_pubs
+
+arcdf.2dim <- arcdf.2dim %>%
+  select(papers, books, chapters, proceedings, editor, confeditor, mainstream, local)
+```
+
+Now let's run archetypal analysis and look at the ideal number of archetypes.
+
+```{r}
+set.seed(1986)
+arcfull1 <- stepArchetypes(
+  data = arcdf.2dim, k =1:5, verbose = T, nrep = 3)
+
+# See ideal number of archetypes based on RSS
+screeplot(arcfull1)
+
+n_model <- 3 # check the optimal number of archetypes
+
+# Optimal number of archetypes per discipline
+# Anthropology - 3
+# Archaeology - 3
+# Arts - 3
+# Cultural Studies - 2
+# Geography - 2
+# History - 3
+# Language & Linguistics - 2
+# Literature - 3
+# Music - 2
+# Paleontology - 2
+# Philology - 3
+# Philosophy - 3
+# Translation Studies - 3
+```
+
+# Plots
+
+```{r}
+
+arcfull_plot <- data.frame(Archetypes=c(1:5),
+                           RSS=NA,
+                           stringsAsFactors = FALSE)
+
+for (i in 1:length(arcfull1)) {
+  arcfull_plot[which(arcfull_plot$Archetypes==i),'RSS'] <- arcfull1[[i]][[1]]$rss
+}
+
+arc_sel <- n_model
+
+arcfull_plot_aux <- arcfull_plot
+arcfull_plot_aux$Archetypes <- arcfull_plot_aux$Archetypes+1
+names(arcfull_plot_aux)[2] <- 'RSS max'
+arcfull_plot <- left_join(arcfull_plot, arcfull_plot_aux)
+
+arcfull_plot_aux$Archetypes <- arcfull_plot_aux$Archetypes-2
+names(arcfull_plot_aux)[2] <- 'RSS min'
+arcfull_plot <- left_join(arcfull_plot, arcfull_plot_aux)
+
+arcfull_plot$`RSS max`[1] <- arcfull_plot$RSS[1]
+arcfull_plot$`RSS min`[5] <- arcfull_plot$RSS[5]
+
+ggplot(data=arcfull_plot, aes(x=Archetypes, y=RSS))+
+  geom_line(size=1.5, color='#1e75b3')+
+  geom_errorbar(aes(ymin = `RSS max`, ymax = `RSS min`),width=0.5)+
+  geom_point(data=arcfull_plot[which(arcfull_plot$Archetypes!=arc_sel),], aes(x=Archetypes, y=RSS), colour='white', fill='#1e75b3', stroke=1, pch=21, size=10)+
+  geom_point(data=arcfull_plot[which(arcfull_plot$Archetypes==arc_sel),], aes(x=Archetypes, y=RSS), colour='white', fill='#ff0302', stroke=1, pch=21, size=10)+
+  theme_classic()+
+  theme(axis.title = element_text(size=14, color='black', face='bold'),
+        axis.text = element_text(size=12, color='black'))
+
+```
+
+Let's look at the parameters for the archetypes:
+
+```{r}
+best_model <- n_model
+arcfull3 <- bestModel(arcfull1[[best_model]])
+
+arcall.params <- t(parameters(arcfull3)) # parameters
+arcall.alpha <- cbind.data.frame(authors_dis$`CODIGO AUTOR DIALNET`, arcfull3[["alphas"]])
+names(arcall.alpha) <- # Alpha scores
+  c("dialnet_id", paste0(rep('archetype', best_model), 1:best_model))
+arcall.alpha$field <- "All fields"
+
+barplot(arcfull3, as.data.frame(arcdf.2dim), percentiles = F)
+```
+
+```{r}
+arcall.alpha$archetype <- apply(arcall.alpha[,paste0(rep('archetype', best_model), 1:best_model)],
+      MARGIN = 1,
+       FUN=function(x){order(x, decreasing=TRUE)[1]})
+
+table(arcall.alpha$archetype)
+
+names(sort(table(arcall.alpha$archetype), decreasing = TRUE))
+
+if(field=='Philology'){
+  remap <- setNames(c(2,1,3),
+                  names(sort(table(arcall.alpha$archetype), decreasing = TRUE)))
+}else{
+  remap <- setNames(sort(unique(arcall.alpha$archetype), decreasing = FALSE),
+                  names(sort(table(arcall.alpha$archetype), decreasing = TRUE)))
+}
+
+
+arcall.alpha$archetype <- remap[as.character(arcall.alpha$archetype)]
+table(arcall.alpha$archetype)
+
+arcall.alpha$id <- 1:dim(arcall.alpha)[1]
+arcdf.2dim$id <- 1:dim(arcdf.2dim)[1]
+
+```
+
+```{r}
+
+arcfull3_sub <- arcall.alpha[,c('id', 'archetype', 'dialnet_id')]
+
+arcfull3_sub <- arcfull3_sub %>%
+  inner_join(authors_dis[,c('CODIGO AUTOR DIALNET', 'Área', 'First_pub')], by=c('dialnet_id'='CODIGO AUTOR DIALNET')) %>%
+  as.data.frame()
+
+arcfull3_sub$archetype <- as.character(arcfull3_sub$archetype)
+
+```
+
+**Warning**: Before executing, it is necessary to run the clustergram analysis.
+
+```{r}
+# It includes the profiles classification
+df_profiles <- read.csv2("data/archetypes.csv",
+                      check.names = FALSE)
+
+df_profiles <- df_profiles[which(df_profiles$Area==field),]
+df_profiles$Archetype <- as.character(df_profiles$Archetype)
+
+arcfull3_sub_plot <- inner_join(arcfull3_sub, df_profiles[,c('Archetype','Label')], by=c('archetype'='Archetype'))
+
+arcfull3_sub_plot$Label <- factor(arcfull3_sub_plot$Label, levels=sort(unique(arcfull3_sub_plot$Label), decreasing = TRUE), ordered=TRUE)
+
+arcfull3_sub_plot_exp <- inner_join(arcfull3_sub_plot, authors[,c(1,14)], by=c('dialnet_id'='CODIGO AUTOR DIALNET'))
+
+ggplot() +
+  geom_density_ridges(data=arcfull3_sub_plot, aes(x=First_pub, y=Label, fill=Label, color=Label),
+                      scale = 1, alpha=0.4, show.legend=TRUE,
+                               jittered_points = TRUE,
+                               position = position_points_jitter(width = 0.1, height = 0),
+                               point_shape = '|', point_size = 1.5, point_alpha = 0.8
+  )+
+  scale_color_manual(values=c('Bicultural Scholar'='#e64b35', 'Global scholar'='#00a087', 'Traditionalist'='#3c5488', 'Monograph specialist'='#7e6148', 'Omni-publication scholar'='#4DBBD5', 'Versatile chapter author'='#F39B7F'), drop = FALSE)+
+  scale_fill_manual(values=c('Bicultural Scholar'='#e64b35', 'Global scholar'='#00a087', 'Traditionalist'='#3c5488', 'Monograph specialist'='#7e6148', 'Omni-publication scholar'='#4DBBD5', 'Versatile chapter author'='#F39B7F'), drop = FALSE)+
+  scale_x_continuous(breaks=seq(1960,2020,20))+
+  scale_y_discrete(expand = expansion(add = c(0.2, 1.2)))+
+  labs(x='', y='')+
+  theme_light() +
+  theme(legend.position = 'bottom',
+        panel.grid.major.x = element_line(linetype = 'dashed', colour = 'grey80'),
+        panel.grid.minor.x = element_blank(),
+        panel.border = element_rect(color = 'black', fill = NA, size = 1), 
+        strip.background = element_rect(color = 'black', fill='black'),
+        strip.text = element_text(size=13, face='bold'),
+        axis.title = element_text(color='black', size=14, face='bold'),
+        axis.text.x = element_text(color='black', size=11),
+        axis.text.y = element_blank(),
+        axis.line = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.ticks.y = element_blank())+
+  facet_wrap(.~'Anthropology')
+
+```

@@ -1,0 +1,254 @@
+---
+title: "Publication profiles of Humanists"
+format: pdf
+editor: visual
+---
+
+```{r}
+library(archetypes)
+library(ggplot2)
+library(tidyverse)
+library(dplyr)
+library(geomtextpath)
+
+```
+
+# Description
+
+```{r}
+authors <- readr::read_delim("data/authors_metrics_dialnet.tsv", 
+    delim = "\t", escape_double = FALSE, 
+    trim_ws = TRUE)
+```
+
+Analysis of a set of 60,063 researchers from the Humanities. They are distributed among 40 different disciplines, but we should reshuffle them. Also there are NA values in some variables.
+
+```{r}
+# summary(authors)
+authors <- authors %>%
+  filter(!is.na(Age)) %>%
+  filter(First_pub > 1949) %>%
+  filter(Total_pubs>1) %>% # TEST
+  filter(Total_pubs != max(Total_pubs)) #Remove the Pope
+
+# Group discipline into broader fields
+disciplina_map <- data.frame( # Lookup table to match disc and fields
+  Disciplina = c(
+    "Antropología Social",
+    "Arqueología",
+    "Expresión Gráfica Arquitectónica",
+    "Expresión Gráfica en la Ingeniería",
+    "Historia del Arte",
+    "Pintura",
+    "Estudios Árabes e Islámicos",
+    "Estudios de Asía Oriental",
+    "Estudios Hebreos y Arameos",
+    "Filología Alemana",
+    "Filología Catalana",
+    "Filología Eslava",
+    "Filología Francesa",
+    "Filología Gallega y Portuguesa",
+    "Filología Griega",
+    "Filología Inglesa",
+    "Filología Italiana",
+    "Filología Latina",
+    "Filología Románica",
+    "Filología Vasca",
+    "Filosofía",
+    "Filosofía Moral",
+    "Lógica y Filosofía de la Ciencia",
+    "Geografía Humana",
+    "Ciencias y Técnicas Historiográficas",
+    "Historia Antigua",
+    "Historia Contemporánea",
+    "Historia de América",
+    "Historia de la Ciencia",
+    "Historia del Pensamiento y de los Movimientos ...",
+    "Historia Medieval",
+    "Historia Moderna",
+    "Prehistoria",
+    "Lengua Española",
+    "Lingüística General",
+    "Lingüística Indoeuropea",
+    "Literatura Española",
+    "Música",
+    "Paleontología",
+    "Traducción e Interpretación"
+  ),
+  field = c(
+    "Anthropology",
+    "Archaeology",
+    "Arts",
+    "Arts",
+    "Arts",
+    "Arts",
+    "Cultural Studies",
+    "Cultural Studies",
+    "Cultural Studies",
+    "Philology",
+    "Philology",
+    "Philology",
+    "Philology",
+    "Philology",
+    "Philology",
+    "Philology",
+    "Philology",
+    "Philology",
+    "Philology",
+    "Philology",
+    "Philosophy",
+    "Philosophy",
+    "Philosophy",
+    "Geography",
+    "History",
+    "History",
+    "History",
+    "History",
+    "History",
+    "History",
+    "History",
+    "History",
+    "History",
+    "Language & Linguistics",
+    "Language & Linguistics",
+    "Language & Linguistics",
+    "Literature",
+    "Music",
+    "Paleontology",
+    "Translation Studies"
+    )
+  )
+
+# Use lookup table to update authors$field
+authors$field <- disciplina_map$field[match(authors$Disciplina, disciplina_map$Disciplina)]
+```
+
+Distribution by field.
+
+```{r}
+authors %>%
+  group_by(field) %>%
+  summarise(count = n(), age = mean(Age)) %>%
+  ggplot(aes(x = reorder(field, count), y = count, fill = age)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Field", y = "No. academics") +
+  theme_classic() +
+  coord_flip()
+```
+
+Evolution per age.
+
+```{r}
+ggplot(authors, aes(x = First_pub)) +
+       geom_histogram(color = "black", fill = "darkgrey") +
+  xlim(1950, 2020) +
+  labs(x ="First publication year", y = "No. academics") +
+  theme_classic()
+```
+
+One would expect age to be highly correlated with number of publications.
+
+```{r}
+cor(authors$Age, authors$Total_pubs)
+```
+
+```{r}
+plot(authors$Age, authors$Total_pubs)
+```
+
+Publication profile by age and by field
+
+# Archetypes
+
+Create distribution.
+
+```{r}
+# Description
+authors %>%
+  select(
+    `CODIGO AUTOR DIALNET`,
+    Article,
+    Book,
+    Chapter,
+    `Proceeding paper`,
+    `Edited-proceedings`,
+    `Edited-book`,
+    Total_pubs,
+    Inter,
+    Local
+  ) %>%
+  tidyr::pivot_longer(
+    cols = !`CODIGO AUTOR DIALNET`,
+    names_to = "variable",
+    values_to = "value"
+  ) %>%
+  group_by(variable) %>%
+  summarise(n = n(), mean(value), sd = sd(value))
+```
+
+I am going to define the variables and conduct the archetypal analysis based on two dimensions:
+
+-   **Type of outputs.** That is, the publication types in which they communicate their findings. we consider 6 publication types:
+
+    -   Books
+
+    -   Book chapters
+
+    -   Proceedings papers
+
+    -   Edited books
+
+    -   Edited proceedings
+
+-   **Outreach.** That is, the international scope of their outputs. We consider two variables:
+
+    -   Publications indexed in WoS and Scopus
+
+    -   Non-English publications
+
+```{r}
+arcdf.2dim <- authors %>%
+  select(Article, Book, Chapter, `Proceeding paper`, `Edited-proceedings`, `Edited-book`, Inter, Local, Total_pubs)
+
+names(arcdf.2dim) <- c("Article", "Book", "Chapter", "Proceedingpaper", "Editedproceedings", "Editedbook", "Inter", "Local", "Total_pubs")
+
+# Create proportions of everything
+
+arcdf.2dim$papers <- arcdf.2dim$Article/arcdf.2dim$Total_pubs
+arcdf.2dim$books <- arcdf.2dim$Book/arcdf.2dim$Total_pubs
+arcdf.2dim$chapters <- arcdf.2dim$Chapter/arcdf.2dim$Total_pubs
+arcdf.2dim$proceedings <- arcdf.2dim$Proceedingpaper/arcdf.2dim$Total_pubs
+arcdf.2dim$editor <- arcdf.2dim$Editedbook / arcdf.2dim$Total_pubs
+arcdf.2dim$confeditor <- arcdf.2dim$Editedproceedings / arcdf.2dim$Total_pubs
+arcdf.2dim$mainstream <- arcdf.2dim$Inter/arcdf.2dim$Total_pubs
+arcdf.2dim$local <- arcdf.2dim$Local/arcdf.2dim$Total_pubs
+
+arcdf.2dim <- arcdf.2dim %>%
+  select(papers, books, chapters, proceedings, editor, confeditor, mainstream, local)
+```
+
+Now let's run archetypal analysis and look at the ideal number of archetypes. Based on the RSS and following an elbow rule, seems to be 3.
+
+```{r}
+set.seed(1986)
+arcfull1 <- stepArchetypes(
+  data = arcdf.2dim, k =1:5, verbose = T, nrep = 3)
+
+# See ideal number of archetypes based on RSS
+screeplot(arcfull1)
+```
+
+Let's look at the parameters for three archetypes:
+
+```{r}
+best_model <- 3
+arcfull3 <- bestModel(arcfull1[[best_model]])
+
+arcall.params <- t(parameters(arcfull3)) # parameters
+arcall.alpha <- cbind.data.frame(authors$`CODIGO AUTOR DIALNET`, arcfull3[["alphas"]])
+names(arcall.alpha) <- # Alpha scores
+  c("dialnet_id", "archetype1", "archetype2", "archetype3")
+arcall.alpha$field <- "All fields"
+
+barplot(arcfull3, as.data.frame(arcdf.2dim), percentiles = F)
+```
