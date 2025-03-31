@@ -403,3 +403,56 @@ ggplot() +
   facet_wrap(.~'Anthropology')
 
 ```
+
+```{r}
+# It includes the profiles classification by field
+arcfull3_sub_plot <- read.csv2(paste0('data/profiles/', area, '.csv'))
+
+arcfull3_sub_plot$Label[which(arcfull3_sub_plot$Label=='Bicultural Scholar')] <- 'The Bridger'
+arcfull3_sub_plot$Label[which(arcfull3_sub_plot$Label=='Global scholar')] <- 'The Cosmopolitan'
+arcfull3_sub_plot$Label[which(arcfull3_sub_plot$Label=='Traditionalist')] <- 'The Local Chronicler'
+arcfull3_sub_plot$Label[which(arcfull3_sub_plot$Label=='Monograph specialist')] <- 'The Sage'
+arcfull3_sub_plot$Label[which(arcfull3_sub_plot$Label=='Omni-publication scholar')] <- 'The Polymath'
+arcfull3_sub_plot$Label[which(arcfull3_sub_plot$Label=='Versatile chapter author')] <- 'The Participant'
+
+arcfull3_sub_plot$Label <- factor(arcfull3_sub_plot$Label, levels=sort(unique(c('The Bridger',
+                                                                               'The Cosmopolitan',
+                                                                               'The Local Chronicler',
+                                                                               'The Sage',
+                                                                               'The Polymath',
+                                                                               'The Participant')), decreasing = FALSE), ordered=TRUE)
+
+ggplot(arcfull3_sub_plot, aes(x = First_pub, fill = Label)) +
+  geom_histogram(
+    position = "fill",
+    binwidth = 3,
+    boundary = 1950,
+    color = NA,
+    alpha = 0.95
+  ) +
+  scale_y_continuous(labels = scales::percent_format(), expand = c(0, 0)) +
+  scale_x_continuous(breaks = seq(1960, 2020, 20), expand = c(0,0)) +
+  scale_fill_manual(values = c(
+    'The Bridger' = '#e64b35',
+    'The Cosmopolitan' = '#00a087',
+    'The Local Chronicler' = '#3c5488',
+    'The Sage' = '#7e6148',
+    'The Polymath' = '#4DBBD5',
+    'The Participant' = '#F39B7F'
+  ), drop = FALSE) +
+  labs() +
+  theme_light() +
+  theme(
+    panel.grid = element_blank(),
+    legend.position = "none",
+    strip.background = element_rect(fill = 'black'),
+    strip.text = element_text(size=13, face='bold'),
+    axis.title = element_blank(),
+    axis.text = element_text(size = 9, color='black'),
+    panel.border = element_rect(color = 'black', fill = NA),
+    panel.grid.minor = element_blank()
+  ) +
+  facet_wrap(.~'Field')
+dev.off()
+
+```
