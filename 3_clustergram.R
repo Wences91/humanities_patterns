@@ -60,3 +60,29 @@ ggplot(df_radar_plot ,
     axis.text.x = element_text(color = "gray12", size = 12, face='bold'),
     legend.position = "none"
   )
+
+
+df_numeric <- df[, 4:11]
+dist_matrix <- dist(df_numeric, method = "euclidean")
+
+mds_result <- cmdscale(dist_matrix, k = 2)  # k=2 para 2 dimensiones
+
+df$MDS1 <- mds_result[,1]
+df$MDS2 <- mds_result[,2]
+
+df$Archetype <- as.factor(df$Archetype)
+
+ggplot(df, aes(x = MDS1, y = MDS2)) +
+  geom_mark_ellipse(aes(group = Label, fill = Label), expand = 0.01, alpha = 0.15, color = NA, show.legend = FALSE) +
+  geom_point(aes(color = Label, shape = Archetype), size = 3) +
+  geom_text_repel(aes(label = Area), size = 3) +
+  scale_fill_manual(values=c('The Bridger'='#e64b35', 'The Cosmopolitan'='#00a087', 'The Local Chronicler'='#3c5488', 'The Sage'='#7e6148', 'The Polymath'='#4DBBD5', 'The Participant'='#F39B7F'))+
+  scale_color_manual(values=c('The Bridger'='#e64b35', 'The Cosmopolitan'='#00a087', 'The Local Chronicler'='#3c5488', 'The Sage'='#7e6148', 'The Polymath'='#4DBBD5', 'The Participant'='#F39B7F'))+
+  theme_light() +
+  theme(legend.position = 'bottom',
+        panel.grid = element_blank(),
+        panel.border = element_rect(color = 'black'),
+        axis.ticks = element_line(color = 'black'),
+        axis.text = element_text(color = 'black')
+        )+
+  labs(color = "Archetype")
